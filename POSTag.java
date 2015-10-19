@@ -172,6 +172,7 @@ public class POSTag
 			inc1(cTag, curtag);
 			
 			for(Iterator k = sent.iterator(); k.hasNext(); ) {
+				
 				Token tok = (Token)k.next();
 				//if (curtag == StartTag){
 				//	previoustag = SprevTag;
@@ -293,7 +294,8 @@ public class POSTag
 	//  Edge to best path to word with tag
 	int[][]   backedge = new int[len + 1][numtags];
 	
-	
+	String previoustag1;
+	int   back = 0;
 	//For words in sentence
 	for(int i = 0; i < pathprob.length - 1; i++) {
 	    String word = ((Token)sent.get(i)).getName().toLowerCase();
@@ -301,10 +303,20 @@ public class POSTag
 
 	    //Loop over tags for this word
 	    for(int j = 0; j < numtags; j++) {
-		String thistag = tags[j];
+	    	if (j == 0){
+	    		previoustag1 = StartTag;
+	    	}
+	    	else{
+	    		previoustag1 = tags[back];
+	    	}
+	    ttkey.set(0,previoustag1);
+		
+	    String thistag = tags[j];
 		Float tagProb1 = (Float)pTag.get(thistag);
 		float tagProb = (tagProb1 == null) ? epsilon : tagProb1.floatValue();
 		twkey.set(0, thistag);
+		
+		ttkey.set(1,thistag);
 		
 		boolean[] knownWord = (boolean[])allWords.get(word);
 		Float twp1 = (Float)pTagWord.get(twkey);
@@ -313,13 +325,18 @@ public class POSTag
 			      ((twp1 == null) ?
 			       epsilon :
 			       twp1.floatValue()));
+		
+		Float tagtagProb1 = (Float)pTagTag.get(ttkey);
+		float tagtagProb = (tagtagProb1 == null) ? smoothing : tagProb1.floatValue();
+		
+		
 		// In a unigram model, only the current probability matters
-		pathprob[i][j]    = twp;
+		pathprob[i][j]    = twp + tagtagProb;
 
 		// Now create the back link to the max prob tag at the previous stage
 		// If we are at the second word or further
 		if (i > 0) {
-		    int   back = 0;
+		    //int   back = 0;
 		    float max  = -100000000f;
 		
 		    //Loop over previous tags
@@ -337,12 +354,18 @@ public class POSTag
 			}
 		    }
 		    backedge[i][j]    = back;
+
+			Token tok = (Token)sent.get(i-1);
+			tok.putAttrib("pos", tags[back]);
+			//prevtag = backedge[i][prevtag];
+		    
+		    
 		}
 	    }
 	}
 
 	//Trace back finding most probable path
-	{
+	/*{
 	    float max    = -100000000f;
 	    int   prevtag = 0;
 	    
@@ -357,12 +380,12 @@ public class POSTag
 	    }
 	    
 	    //Follow back edges to start tag and set tags on words
-	    for(int i = len-1; i >= 0; i--) {
-		Token tok = (Token)sent.get(i);
-		tok.putAttrib("pos", tags[prevtag]);
-		prevtag = backedge[i][prevtag];
-	    }
-	}
+	    //for(int i = len-1; i >= 0; i--) {
+		//Token tok = (Token)sent.get(i);
+		//tok.putAttrib("pos", tags[prevtag]);
+		//prevtag = backedge[i][prevtag];
+	    //}
+	}*/
     }
     
     /**
