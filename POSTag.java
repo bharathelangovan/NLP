@@ -27,6 +27,10 @@ public class POSTag
      * Special start tag
      */
     public static String StartTag = "*START*";
+    /**
+     * Special start tag
+     */
+    public static String SprevTag = "*Previous*";
     
     /**
      * Small probability for when not found
@@ -42,7 +46,10 @@ public class POSTag
      * Probability of tags given specific words
      */
     protected HashMap pTagWord;
-    
+    /**
+     * Probability of tags tag pair : transition probability
+     */
+    protected HashMap pTagTag;
     /**
      * Probability of individual tags (i.e., P(tag)
      */
@@ -59,6 +66,7 @@ public class POSTag
     public POSTag()
     {
 	pTagWord    = new HashMap();
+	pTagTag    = new HashMap();
 	pTag        = new HashMap();
 	allWords    = new HashMap();
     }
@@ -70,6 +78,7 @@ public class POSTag
     {
 	pTag.clear();
 	pTagWord.clear();
+	pTagTag.clear();
 	allWords.clear();
 	tags = null;
     }
@@ -119,7 +128,23 @@ public class POSTag
 		h2.put(key, ip);
 	    }
     }
-    
+    protected void inc3(HashMap h3, String tag1, String tag2)
+    {
+	//Have to use Vector because arrays aren't hashable
+	Vector key = new Vector(2);
+	key.setSize(2);
+	key.set(0, tag1);
+	key.set(1, tag2);
+	
+	if(h3.containsKey(key)) {
+		int[] ip = (int[])h3.get(key);  //Used as int *
+		ip[0]++;
+	} else {
+		int[] ip = new int[1];
+		ip[0] = 1;
+		h3.put(key, ip);
+	    }
+    }
     /**
      * Train the part of speech tagger.
      *
@@ -131,11 +156,12 @@ public class POSTag
 	HashMap cWord    = new HashMap();
 	HashMap cTag     = new HashMap();
 	HashMap cTagWord = new HashMap();
+	HashMap cTagTag = new HashMap();
 	boolean[] bTrue = new boolean[1];
 	bTrue[0] = true;
 	
 	clear();
-
+	String previoustag;
 	//Count word and tag occurrences
 	for(Iterator i = training.iterator(); i.hasNext();) {
 		Vector para = (Vector)i.next();
@@ -147,15 +173,22 @@ public class POSTag
 			
 			for(Iterator k = sent.iterator(); k.hasNext(); ) {
 				Token tok = (Token)k.next();
+				//if (curtag == StartTag){
+				//	previoustag = SprevTag;
+				//	inc1(cTag, previoustag);
+				//}
+				//else{
+				previoustag = curtag;
+				//}
 				
 				curtag = (String)tok.getAttrib("pos");
 				inc1(cTag, curtag);
-				
 				String name = tok.getName().toLowerCase();
 				inc1(cWord, name);
 				allWords.put(name, bTrue);
 				inc2(cTagWord, curtag, name);
 				cTokens++;
+				inc3(cTagTag, previoustag,curtag);
 			    }
 		    }
 	    }
@@ -176,6 +209,14 @@ public class POSTag
 	}
 	//Make list of all possible tags
 	tags = (String[])cTag.keySet().toArray(new String[0]);
+	
+	for(Iterator i = cTagTag.keySet().iterator(); i.hasNext();) {
+	    Vector key   = (Vector)i.next();
+	    int[]  count = (int[])cTagTag.get(key);
+	    int[]  total = (int[])cTag.get(key.get(0));
+
+	    pTagTag.put(key, new Float(Math.log((((float)count[0])+1) / (((float)total[0])+tags.length))));
+	}
     }
     
     /**
@@ -234,9 +275,17 @@ public class POSTag
 	}
 	
 	int numtags = tags.length;
+	System.out.println(numtags);
+	
+	float smoothing = (float) Math.log(1/(float)numtags);
+	
+	System.out.println(smoothing);
 	
 	Vector twkey = new Vector(2);
 	twkey.setSize(2);
+	
+	Vector ttkey = new Vector(2);
+	ttkey.setSize(2);
 	
 	//Probability of best path to word with tag
 	float[][] pathprob = new float[len + 1][numtags]; 
